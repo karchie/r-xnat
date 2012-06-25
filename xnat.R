@@ -138,8 +138,10 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
                     postfields = data, 
                     ssl.verifypeer = FALSE, 
                     cookie = paste('JSESSIONID=', jsid, sep = ''))
-        if(parseHTTPHeader(header$value())['status'] != 200) {
-            stop('error during HTTP request')
+        parsed <- parseHTTPHeader(header$value())
+        status <- parsed[['status']]
+        if (status != 200) {
+          stop(sprintf('error %s : %s', status, parsed))
         }
         return(reader$value())
     }
@@ -327,18 +329,22 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
             tkwait.window(tt)
             password <- tclvalue(pwVar)
         }
-        curlPerform(url = paste(base_url, '/data/JSESSION', sep = ''), 
+
+        curlPerform(url = paste(base_url, '/data/JSESSION', sep='')
                     writefunction = reader$update, 
                     headerfunction = header$update, 
                     ssl.verifypeer = FALSE, 
-                    userpwd = paste(username, password, sep = ':'))
-        status = parseHTTPHeader(header$value())['status']
-        if(status == 401) {
-            stop('bad username/password')
-        } else if(status != 200) {
-            stop('error authenticating')
+                    userpwd = paste(username, password, sep = ':'),
+                    httpauth=1L)
+        parsed <- parseHTTPHeader(header$value())
+        status <- parsed[['status']]
+        if (200 == status) {
+          jsid <- reader$value()
+        } else if (401 == status) {
+          stop('Unauthorized: check your username and password')
+        } else {
+          stop(sprintf('error %s authenticating: %s', status, parsed))
         }
-        jsid <<- reader$value()
     }
 
     .projects <- NULL
