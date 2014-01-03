@@ -1,8 +1,8 @@
 library(RCurl)
 library(XML)
 
-have_tcltk <- TRUE
-tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
+jsid <- Sys.getenv("JSESSIONID")
+base_url <- Sys.getenv("XNAT_URL")
 
 .subject_search_xml <- '<?xml version="1.0" encoding="UTF-8"?>
 <xdat:search allow-diff-columns="0" secure="false"
@@ -121,9 +121,8 @@ tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
 
 }
 
-xnat.connection <- function(base_url, username=NULL, password=NULL)
+xnat.connection <- function()
 {
-
     .xnat.call <- function(request, customrequest = 'GET', data='') {
         if(is.null(jsid))
             stop('not connected')
@@ -142,11 +141,6 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
             stop('error during HTTP request')
         }
         return(reader$value())
-    }
-
-    close <- function() {
-        data <- .xnat.call('/data/JSESSION', customrequest = 'DELETE')
-        jsid <<- NULL
     }
 
     projects <- function() {
@@ -310,53 +304,6 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
 
     reader <- basicTextGatherer()
     header <- basicTextGatherer()
-    if(is.null(username)) {
-        curlPerform(url = paste(base_url, '/', sep = ''), 
-                    writefunction = reader$update, 
-                    headerfunction = header$update, 
-                    ssl.verifypeer = FALSE)
-        jsid <<- NULL
-        for(h in strsplit(header$value(), '\n')[[1]]) {
-            if(substring(h, 1, 23) == 'Set-Cookie: JSESSIONID=') {
-                jsid <<- strsplit(substring(h, 24), ';')[[1]][[1]]
-            }
-        }
-        if(is.null(jsid)) {
-            stop('error starting session')
-        }
-    } else {
-        if(is.null(password)) {
-            if(!have_tcltk) {
-                stop("can't prompt for password without tcltk")
-            }
-            tt <- tktoplevel()
-            tktitle(tt) <- 'XNAT Password'
-            onOK <- function() {
-                tkgrab.release(tt)
-                tkdestroy(tt)
-            }
-            lab <- tklabel(tt, text='Password:')
-            pwVar <- tclVar()
-            pw <- tkentry(tt, textvariable=pwVar, show='*')
-            but <- tkbutton(tt, text='OK', command=onOK)
-            tkgrid(lab, pw, but)
-            tkfocus(tt)
-            tkwait.window(tt)
-            password <- tclvalue(pwVar)
-        }
-        curlPerform(url = paste(base_url, '/data/JSESSION', sep = ''), 
-                    writefunction = reader$update, 
-                    headerfunction = header$update, 
-                    ssl.verifypeer = FALSE, 
-                    userpwd = paste(username, password, sep = ':'))
-        status = parseHTTPHeader(header$value())['status']
-        if(status == 401) {
-            stop('bad username/password')
-        } else if(status != 200) {
-            stop('error authenticating')
-        }
-        jsid <<- reader$value()
-    }
 
     .projects <- NULL
     .subjects <- NULL
@@ -375,7 +322,6 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
     class(rv) <- 'XNATConnection'
 
     return(rv)
-
 }
 
 # eof
