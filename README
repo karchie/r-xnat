@@ -1,13 +1,16 @@
 XNAT library for R
 
-requires RCurl and XML
+Original author: Christian Haselgrove
 
-tcltk is needed for password prompting
+Modified by Kevin Archie <karchie@wustl.edu> for invocation from
+inside an XNAT webapp; environment variables JSESSIONID and XNAT_URL
+must be set
+
+requires RCurl and XML
 
 example:
 
     > source('xnat.R')
-    > conn <- xnat.connection('https://central.xnat.org')
+    > conn <- xnat.connection()  # host,auth specified in env var
     > conn$projects()
-    > conn$subjects('CENTRAL_OASIS_CS')
-    > conn$close()
+    > conn$subjects('test_project')
