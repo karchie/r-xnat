@@ -4,6 +4,8 @@ library(XML)
 have_tcltk <- TRUE
 tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
 
+.xnat.search.type.nosubject <- c('xnat:subjectData')
+
 .xnat.search.xml.build <- function(xsitype, fields, constraints=NULL) {
   header <- sprintf('<?xml version="1.0" encoding="UTF-8"?>
   <xdat:search allow-diff-columns="0" secure="false"
@@ -13,7 +15,7 @@ tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
   <xdat:root_element_name>%s</xdat:root_element_name>', xsitype)
   footer <- '\n</xdat:search>'
   
-  fields.text=mapply(function(field, index) {
+  fields.text <- mapply(function(field, index) {
     sprintf('
 <xdat:search_field>
   <xdat:element_name>%s</xdat:element_name>
@@ -22,11 +24,20 @@ tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
 </xdat:search_field>',
             xsitype, field, index)
   }, fields, seq(0, length(fields)-1), SIMPLIFY=TRUE, USE.NAMES=FALSE)
+
+  if (! xsitype %in% .xnat.search.type.nosubject) {
+    fields.text <- c(fields.text, sprintf('
+<xdat:search_field>
+  <xdat:element_name>xnat:subjectData</xdat:element_name>
+  <xdat:field_ID>SUBJECT_LABEL</xdat:field_ID>
+  <xdat:sequence>%s</xdat:sequence>
+</xdat:search_field>', length(fields)))
+  }
   
   constraint.text <- if (is.null(constraints) || 0 == length(constraints))
     ''
   else {
-    constraint.matrix = array(constraints, dim=c(3,length(constraints)/3))
+    constraint.matrix <- array(constraints, dim=c(3,length(constraints)/3))
     c('<xdat:search_where method="OR">',
       mapply(function(field, comparison, value) {
         sprintf('
@@ -46,15 +57,15 @@ tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
 .csv.from.string <- function(string)
 {
   c <- textConnection(string)
-  csv <- read.csv(c, header=TRUE, as.is = TRUE)
+  csv <- read.csv(c, header=TRUE, as.is=TRUE)
   close(c)
   
   return(csv)
 }
 
 .frame.columns.rename <- function(frame, ...) {
-  renames = list(...)
-  to.rename = colnames(frame) %in% names(renames)
+  renames <- list(...)
+  to.rename <- colnames(frame) %in% names(renames)
   colnames(frame)[to.rename] <- lapply(colnames(frame)[to.rename],
                                        function(name) renames[[name]])
   frame
@@ -64,20 +75,20 @@ tryCatch(library(tcltk), error=function(e) have_tcltk <<- FALSE)
 xnat.connection <- function(base_url, username=NULL, password=NULL)
 {
 
-    .xnat.call <- function(request, customrequest = 'GET', data='') {
+    .xnat.call <- function(request, customrequest='GET', data='') {
         if(is.null(jsid))
             stop('not connected')
         reader <- basicTextGatherer()
         header <- basicTextGatherer()
         if(nchar(data) > 0)
-            customrequest = 'POST'
-        curlPerform(url = paste(base_url, request, sep = ''), 
-                    writefunction = reader$update, 
-                    headerfunction = header$update, 
-                    customrequest = customrequest, 
-                    postfields = data, 
-                    ssl.verifypeer = FALSE, 
-                    cookie = paste('JSESSIONID=', jsid, sep = ''))
+            customrequest <- 'POST'
+        curlPerform(url=paste(base_url, request, sep=''), 
+                    writefunction=reader$update, 
+                    headerfunction=header$update, 
+                    customrequest=customrequest, 
+                    postfields=data, 
+                    ssl.verifypeer=FALSE, 
+                    cookie=paste('JSESSIONID=', jsid, sep=''))
         if(parseHTTPHeader(header$value())['status'] != 200) {
             stop('error during HTTP request')
         }
@@ -96,7 +107,7 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
     }
 
     close <- function() {
-        data <- .xnat.call('/data/JSESSION', customrequest = 'DELETE')
+        data <- .xnat.call('/data/JSESSION', customrequest='DELETE')
         jsid <<- NULL
     }
 
@@ -114,7 +125,7 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
    # requests without a project constraint are cached;
    # requests with a project constraint do not use the cache because
    # we also want subjects that have been shared into the named project
-    subjects <- function(project = NULL) {
+    subjects <- function(project=NULL) {
       if(!is.null(project) && !project %in% projects()$ID) {
         stop(sprintf('unknown project "%s"', project))
       } 
@@ -129,7 +140,7 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
         csv <- .csv.from.string(data)
 
         # we don't want some of the columns; drop these
-        csv <- subset(csv, select = -c(subject_id, quarantine_status))
+        csv <- subset(csv, select=-c(subject_id, quarantine_status))
 
         # some of the columns returned from XNAT are weirdly named; rename these
         csv <- frame.columns.rename(csv,
@@ -159,13 +170,13 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
       table <- .frame.columns.rename(table, 'ELEMENT_NAME'='type', 'SINGULAR'='name')
     }
       
-    .get.experiment.types <- function(project = NULL, subject = NULL) {
+    .get.experiment.types <- function(project=NULL, subject=NULL) {
         if(is.null(.experiment.types)) {
             # we're getting searchable types here, which may not be complete, 
             # but is better than nothing
             data <- .xnat.call('/data/search/elements?format=csv')
             csv <- .csv.from.string(data)
-            et <- grep('^xnat:.*SessionData$', csv$ELEMENT_NAME, value = TRUE)
+            et <- grep('^xnat:.*SessionData$', csv$ELEMENT_NAME, value=TRUE)
             if(length(et) == 0) {
                 warning('error getting experiment types; falling back on CT, MR, PET, US')
                 .experiment.types <<- c('xnat:ctSessionData', 
@@ -179,26 +190,20 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
         return(.experiment.types)
       }
 
-    experiments <- function(e_project = NULL, e_subject = NULL) {
+    experiments <- function(e_project=NULL, e_subject=NULL) {
         if(is.null(.experiments)) {
             experiments <- NULL
             for(type in .get.experiment.types()) {
               in_data <- .xnat.search.xml.build(type,
                                                 c('PROJECT','LABEL','SUBJECT_ID','AGE'))
                 out_data <- .xnat.call('/data/search?format=csv', 
-                                       data = in_data)
+                                       data=in_data)
                 csv <- .csv.from.string(out_data)
                 if(nrow(csv) > 0) {
                     if(type == 'xnat:mrSessionData') {
-                        csv <- subset(csv, select = c(subject_id, 
-                                                      session_id, 
-                                                      label, 
-                                                      age))
+                        csv <- subset(csv, select=c(subject_id, session_id, label, age))
                     } else {
-                        csv <- subset(csv, select = c(subject_id, 
-                                                      expt_id, 
-                                                      label, 
-                                                      age))
+                        csv <- subset(csv, select = c(subject_id, expt_id, label, age))
                     }
                     names(csv) <- c('subject_id', 'ID', 'label', 'age')
                     csv$type <- rep(type, nrow(csv))
@@ -209,11 +214,11 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
         if(is.null(experiments)) {
             .experiments <<- data.frame()
         } else {
-            ss <- subset(subjects(), select = c(ID, label, project))
+            ss <- subset(subjects(), select=c(ID, label, project))
             experiments <- merge(experiments, 
                                  ss, 
-                                 by.x = 'subject_id', 
-                                 by.y = 'ID')
+                                 by.x='subject_id', 
+                                 by.y='ID')
             experiments <- subset(experiments, select = c(project, 
                                                           label.y, 
                                                           ID, 
@@ -251,6 +256,13 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
         return(.experiments)
     }
 
+    .search.subject.joined.renames <- list('xnat_subjectdata_subject_label'='subject_label',
+                                           'xnat_subjectdata_project'='subject_project')
+    .search.subject.joined.discards <- c('xnat_subjectdata_subjectid',
+					 'xnat_subjectdata_insert_user',
+                                         'xnat_subjectdata_insert_date',
+					 'xnat_subjectdata_projects')
+					 
     .search.type.named <- function(type, project=NULL) {
       if (is.null(type)) {
         return(.experiments.multitype(e_project=project))
@@ -263,6 +275,12 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
                              .search.fields.get(type)$name,
                              project))
         table <- .csv.from.string(text)
+        ns <- tolower(sub(':\\w+', '', type))
+        nstype <- tolower(sub('\\w+:', '', type))
+        subjlabel <- sprintf('xnat_subjectdata_subject_label', ns, nstype)
+
+	table <- do.call(.frame.columns.rename, c(list(table), .search.subject.joined.renames))
+	table <- table[,!(colnames(nt) %in% .search.subject.joined.discards)]
       }
     }
 
@@ -278,7 +296,7 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
         data <- .xnat.call(paste('/data/search/saved/', 
                                  search_id, 
                                  '/results?format=csv', 
-                                 sep = ''))
+                                 sep=''))
         csv <- .csv.from.string(data)
         return(csv)
     }
@@ -292,10 +310,10 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
     reader <- basicTextGatherer()
     header <- basicTextGatherer()
     if(is.null(username)) {
-        curlPerform(url = paste(base_url, '/', sep = ''), 
-                    writefunction = reader$update, 
-                    headerfunction = header$update, 
-                    ssl.verifypeer = FALSE)
+        curlPerform(url=paste(base_url, '/', sep = ''), 
+                    writefunction=reader$update, 
+                    headerfunction=header$update, 
+                    ssl.verifypeer=FALSE)
         jsid <<- NULL
         for(h in strsplit(header$value(), '\n')[[1]]) {
             if(substring(h, 1, 23) == 'Set-Cookie: JSESSIONID=') {
@@ -325,12 +343,12 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
             tkwait.window(tt)
             password <- tclvalue(pwVar)
         }
-        curlPerform(url = paste(base_url, '/data/JSESSION', sep = ''), 
-                    writefunction = reader$update, 
-                    headerfunction = header$update, 
-                    ssl.verifypeer = FALSE, 
-                    userpwd = paste(username, password, sep = ':'))
-        status = parseHTTPHeader(header$value())['status']
+        curlPerform(url=paste(base_url, '/data/JSESSION', sep=''), 
+                    writefunction=reader$update, 
+                    headerfunction=header$update, 
+                    ssl.verifypeer=FALSE, 
+                    userpwd=paste(username, password, sep=':'))
+        status <- parseHTTPHeader(header$value())['status']
         if(status == 401) {
             stop('bad username/password')
         } else if(status != 200) {
@@ -345,16 +363,16 @@ xnat.connection <- function(base_url, username=NULL, password=NULL)
     .experiments <- NULL
     .saved.searches <- NULL
 
-    rv = list(base_url = base_url, 
-      close = close, 
-      is.connected = is.connected, 
-      projects = projects, 
-      subjects = subjects, 
-      experiments = experiments,
-      fields = .search.fields.get,
-      types = .search.types.get,
-      get = .search.type.named,
-      run.stored.search = run.stored.search)
+    rv <- list(base_url=base_url, 
+      close=close, 
+      is.connected=is.connected, 
+      projects=projects, 
+      subjects=subjects, 
+      experiments=experiments,
+      fields=.search.fields.get,
+      types=.search.types.get,
+      get=.search.type.named,
+      run.stored.search=run.stored.search)
 
     class(rv) <- 'XNATConnection'
 
