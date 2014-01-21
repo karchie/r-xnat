@@ -1,0 +1,5 @@
+*~
+working/
+..Rcheck/
+*.tar.gz
+R.XNAT.Rcheck/

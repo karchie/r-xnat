@@ -1,0 +1,13 @@
+Package: R.XNAT
+Version: 0.1.0
+Date: 2014-01-14
+Title: XNAT client
+Authors@R: c(person("Kevin", "Archie", role=c("aut","cre"), email="karchie@wustl.edu"),
+	     person("Christian", "Haselgrove", role=c("aut"),
+                    email="christian.haselgrove@umassmed.edu"))
+Depends: RCurl, XML
+Suggests: tcltk
+Description: A client library for retrieving data from an XNAT imaging informatics server.
+License: BSD
+URL: http://xnat.org
+BugReports: http://issues.xnat.org

@@ -1,5 +1,5 @@
 library(RUnit)
-source('xnat.R')
+source('R/xnat.R')
 
 test.suite <- defineTestSuite("xnat", 
                               dirs="test.d", 
