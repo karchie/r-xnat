@@ -124,14 +124,14 @@ setMethod('getProjects', signature('XNAT'),
           function (.Object) {
             text <- request(.Object, '/data/projects?format=csv')
             projects <- .csv.from.string(text)
-            projects <- projects[with(projects, order(ID)),]
           })
 
 setGeneric('getSubjects', function (.Object, ...) standardGeneric('getSubjects'))
 setMethod('getSubjects', signature('XNAT'),
           function (.Object, project = NULL) {
             projects <- getProjects(.Object)
-            if (!is.null(project) && !project %in% projects$ID) {
+            idcol = grep('^id$', colnames(projects), ignore.case=TRUE)
+            if (!is.null(project) && !project %in% t(projects[idcol])) {
               stop(sprintf('unknown project "%s"', project))
             } 
             fields <- c('PROJECT','ID','LABEL','GENDER_TEXT','HANDEDNESS_TEXT',
@@ -188,7 +188,9 @@ setMethod('getData',
             
             table <- do.call(.frame.columns.rename, c(list(table), kJoinedSubjectRenames))
             
-            if (type != 'xnat:subjectData') {
+            if (type == 'xnat:subjectData') {
+                table
+            } else {
               subject.fields <- matrix(as.list(add.fields), nrow=2, byrow=TRUE)
               subject.fields <- subject.fields[subject.fields[1] == 'xnat:subjectData'][2]
               discards <- subset(kJoinedSubjectDiscards, 
@@ -291,4 +293,12 @@ kOmitSubjectTypes <- c('xnat:subjectData')
   frame
 }
 
+# This doesn't exactly belong here, other than that it came up
+# in the context of building histograms from ranges in an XNAT
+XNAT.rangemin <- function (rangestr) {
+    r <- gsub('^([0-9]+)-[0-9]+$', '\\1', rangestr)
+    r <- gsub('^&amp;gt;([0-9]+)$', '\\1', r)
+    r <- gsub('^&amp;lt;([0-9]+)$', '0', r)
+}
+              
 # eof

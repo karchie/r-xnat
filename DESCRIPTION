@@ -5,6 +5,8 @@ Title: XNAT client
 Authors@R: c(person("Kevin", "Archie", role=c("aut","cre"), email="karchie@wustl.edu"),
 	     person("Christian", "Haselgrove", role=c("aut"),
                     email="christian.haselgrove@umassmed.edu"))
+Author: Kevin A. Archie, adapted from an earlier library by Christian Haselgrove
+Maintainer: Kevin A. Archie <karchie@wustl.edu>
 Depends: RCurl, XML
 Suggests: tcltk
 Description: A client library for retrieving data from an XNAT imaging informatics server.

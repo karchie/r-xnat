@@ -1,1 +1,1 @@
-export(XNAT, getTypes, getFields, getProjects, getSubjects, getData, doStoredSearch)
+export(XNAT, getTypes, getFields, getProjects, getSubjects, getData, doStoredSearch, XNAT.rangemin)
